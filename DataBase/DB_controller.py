@@ -22,7 +22,7 @@ class Frame(Base):
 
 class Context:
     def __init__(self,db_path):
-        self.engine = create_engine("sqlite:///"+db_path)
+        self.engine = create_engine("mysql:///"+db_path)
         Base.metadata.create_all(self.engine)
 
     def StartSession(self):
@@ -33,23 +33,31 @@ class Context:
         self.session.commit()
 
     def AddKlient(self,ip):
-        Session = sessionmaker(bind=self.engine)
-        session = Session()
+        self.StartSession()
         new_klient = Klient(ip)
-        session.add(new_klient)
-        session.commit()
+        self.session.add(new_klient)
+        self.EndSession()
+
+
+    def GetKlient(self,ip):
+        self.StartSession()
+        select_klient = self.session.query(Klient).filter_by(ip=ip).first()
+        self.EndSession()
+        return select_klient
+
 
     def AddFrame(self,klientIp,path,time):
         self.StartSession()
         new_frame = Frame(path,time)
-        select_klient = self.session.query(Klient).filter_by(ip='test_token').first()
+        select_klient = self.GetKlient(klientIp)
         new_frame.parent = select_klient
         self.session.commit()
         self.EndSession()
 
-    def GetFrames(self,klient_ip):
+    def GetFramePathes(self,klientIp):
         self.StartSession()
-        selectFrames = self.session.query(Frame).filter_by(klient_ip=klient_ip).first()
-        self.EndSession()
+        query = "select path from Frame where  Frame.klient_ip='"+klientIp+"'"
+        selectFrames = self.session.execute(query)
+
         return selectFrames
 
