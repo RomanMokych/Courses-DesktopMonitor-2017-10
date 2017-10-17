@@ -1,16 +1,11 @@
-from DataBase.DB_controller import  Klient,Frame,Context
-conx = Context("D:\Db.db")
+from DataBase.DB_controller import  Client,Context
+from sqlalchemy.dialects.mysql import DATETIME
+
+conx = Context("mysql://vova:1234@127.0.0.1:3306/desktopdb")
 
 
-
-#conx.AddKlient("ip"+count)
-#conx.AddFrame("ip1"+count,"path"+count,"time"+count)
-conx.AddFrame("ip1","path5","time7")
-
-res = conx.GetFramePathes("ip1")
-
-mur = res.fetchall()
-print(mur)
-
-if len(mur):
-    print("yes")
+ff= conx.GetRangeFrames("2020-10-17 17:00:00","2010-10-17 17:00:00",1)
+f = ff.fetchall()
+print(f)
+for row in ff:
+    print(row)
