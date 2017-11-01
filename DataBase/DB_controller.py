@@ -13,7 +13,7 @@ class Client(Base):
         self.ip = ip
 
 class Frame(Base):
-    __tablename__ = 'frame'
+    __tablename__ = 'Frame'
     id = Column(Integer,primary_key=True)
     path = Column(String(50),unique=True)
     time = Column(DATETIME)
@@ -23,6 +23,15 @@ class Frame(Base):
     def __init__(self,path,time):
         self.path = path
         self.time = time
+
+class Roles(Base):
+    __tablename__ = 'Roles'
+    token = Column(String(45),primary_key=True,unique=True)
+    user_name = Column(String(45))
+
+    def __init__(self,role,token):
+        self.token= token
+        self.user_name = role
 
 class Context:
     def __init__(self,conString):
@@ -42,12 +51,6 @@ class Context:
         self.session.add(new_client)
         self.EndSession()
 
-    def GetClient(self,ip):
-        self.StartSession()
-        select_client = self.session.query(Client).filter_by(ip=ip).first()
-        self.EndSession()
-        return select_client
-
     def AddFrame(self,clientIp,path,time):
         self.StartSession()
         new_frame = Frame(path,time)
@@ -56,6 +59,20 @@ class Context:
         self.session.commit()
         self.EndSession()
 
+    def AddRole(self,role,token):
+        self.StartSession()
+        new_role = Roles(role,token)
+        self.session.add(new_role)
+        self.EndSession()
+
+    def IsClient(self,client_ip):
+        self.StartSession()
+        clientRes= self.GetClient(client_ip)
+        if clientRes is None:
+            return False
+        else:
+            return True
+
     def GetFramePathes(self,clientid):
         self.StartSession()
         query = "select path from Frame where Frame.client_id ='%d'"%clientid
@@ -63,6 +80,12 @@ class Context:
         selectFrames = self.session.execute(query)
 
         return selectFrames
+
+    def GetClient(self,ip):
+        self.StartSession()
+        select_client = self.session.query(Client).filter_by(ip=ip).first()
+        self.EndSession()
+        return select_client
 
     def GetRangeFrames(self,startTime,endTime,clientId):
         self.StartSession()

@@ -1,11 +1,21 @@
 from DataBase.DB_controller import  Client,Context
 from sqlalchemy.dialects.mysql import DATETIME
+from Server.DataCrypter import Crypter
+from Server.ServWrapper import  DeskServer
 
-conx = Context("mysql://vova:1234@127.0.0.1:3306/desktopdb")
+
+crptr = Crypter(b"MyHardKe")
+
+val = b"111"
+val_encr = crptr.encrypt(val)
+
+print(val_encr)
+val = crptr.decrypt(val_encr)
+print(val)
 
 
-ff= conx.GetRangeFrames("2020-10-17 17:00:00","2010-10-17 17:00:00",1)
-f = ff.fetchall()
-print(f)
-for row in ff:
-    print(row)
+#conStr= "mysql://vova:1234@127.0.0.1:3306/desktopdb"
+
+#server  = DeskServer(conStr,".",8000)
+#server.run()
+
