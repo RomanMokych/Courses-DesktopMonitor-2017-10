@@ -8,10 +8,6 @@ conStr = "mysql://vova:1234@127.0.0.1:3306/desktopdb"
 
 server = DeskServer(conStr, "D:/pics", 8000)
 
-
-timestamp = datetime.now()
-print(timestamp)
-
 #server.dbConx.AddRole('client', clientPass)
 #server.dbConx.AddRole('viewer', viewerPass)
 #server.dbConx.AddClient("ip1")

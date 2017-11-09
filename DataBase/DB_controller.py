@@ -34,7 +34,7 @@ class Role(Base):
 
 class Context:
     def __init__(self, conString):
-        self.engine = create_engine(conString)
+        self.engine = create_engine(conString,pool_size=20,max_overflow=2000)
         Base.metadata.create_all(self.engine)
 
     def StartSession(self):

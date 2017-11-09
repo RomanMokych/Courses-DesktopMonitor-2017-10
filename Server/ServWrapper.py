@@ -83,17 +83,19 @@ class DeskServer:
         if not os.path.isdir(self.path + str("/") + pack.klientIp):
             os.makedirs(self.path + str("/") + pack.klientIp)
 
-        if self.dbConx.IsClient(pack.klientIp) is None:
-            self.dbConx.AddClient(pack.client_ip)
+        if self.dbConx.IsClient(pack.klientIp) == False:
+            self.dbConx.AddClient(pack.klientIp)
 
         dtimeStamp = datetime.now()
         dtimestr = int(time.mktime(datetime.now().timetuple()))
 
         allPass= self.path+str("/")+pack.klientIp + str("/") + str(dtimestr)+'.jpg' #jpg
 
+        print("need to Addd file")
         if not os.path.isfile(allPass):
             file = open(allPass, 'wb')
             file.write(bytearray(pack.bData))
+            print("Addd file")
 
         self.dbConx.AddFrame(pack.klientIp, dtimeStamp)
 
