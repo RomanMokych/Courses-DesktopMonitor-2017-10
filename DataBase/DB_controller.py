@@ -87,11 +87,19 @@ class Context:
         self.EndSession()
         return select_client
 
-    def GetRangeFrames(self, startTime, endTime, clientId):
+    def GetAlLIP(self):
         self.StartSession()
+        selIp = self.session.execute("SELECT ip from client")
+        self.EndSession()
+        return selIp
+
+    def GetRangeFrames(self, startTime, endTime, clientip):
+        self.StartSession()
+        client_id = self.GetClient(clientip)
+
         convDateEnd = "STR_TO_DATE('" + startTime + "','%Y-%m-%d %H:%i:%s')"
         convDateStart = "STR_TO_DATE('" + endTime + "','%Y-%m-%d %H:%i:%s')"
-        query = "select path from Frame where Frame.time BETWEEN %s and %s and Frame.client_id='%d'"%(convDateStart, convDateEnd, clientId)
+        query = "select path from Frame where Frame.time BETWEEN %s and %s and Frame.client_id='%d'"%(convDateStart, convDateEnd, client_id.id)
         print(query)
         selectFrames = self.session.execute(query)
 
