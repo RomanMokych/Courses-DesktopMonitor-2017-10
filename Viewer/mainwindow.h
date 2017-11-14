@@ -2,8 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include "svclient.h"
-
+#include "client.h"
 namespace Ui {
 class MainWindow;
 }
@@ -16,13 +15,16 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
-
 private slots:
     void on_pushButton_clicked();
 
+    void on_MainWindow_tabifiedDockWidgetActivated(QDockWidget *dockWidget);
+
+    void on_pushButton_Show_clicked();
+
 private:
     Ui::MainWindow *ui;
-
+    VClient client;
 };
 
 #endif // MAINWINDOW_H
