@@ -29,21 +29,35 @@ class ServHandler(protocol.Protocol):
                 self.parent.SaveData(self.pack)
                 self.EraseTmpData()
 
+        if self.role == 'viewer':
+            jmeta = json.loads(data)
+            paches = self.parent.dbConx.GetRangeFrames(jmeta['startT'], jmeta['endT'], jmeta['ip'])
+            self.sendFrames(paches)
+
     def ReceivedtAll(self, jmeta):
         token = jmeta['token']
         self.role = self.parent.dbConx.RoleInit(token).user_name
 
         if self.role is not None:
             self.catchFlag = True
-            self.transport.write(b"00")
 
         if self.role == 'client':
+            self.transport.write(b"00")
             self.pack.klientIp = self.transport.getPeer().host
             self.pack.size = int(jmeta['size'])
 
-        if self.role is 'viewer':
-            pass
-            #обрабатываем запрос вивера
+        if self.role == 'viewer':
+            allIp = self.parent.GetAllIp()
+            self.transport.write(allIp)
+            print("send")
+            print(allIp)
+
+    def sendFrames(self,paches,client_ip):
+        self.transport.write(len(paches))
+
+        for p in paches:
+            full = self.parent.path+'/'+client_ip+'/'+p
+            self.transport.write(self.parent.bytes_from_file(full))
 
     def RecivedClient(self, data):
         self.pack.bData += data
@@ -95,9 +109,21 @@ class DeskServer:
         if not os.path.isfile(allPass):
             file = open(allPass, 'wb')
             file.write(bytearray(pack.bData))
-            print("Addd file")
+            print("Add file")
 
         self.dbConx.AddFrame(pack.klientIp, dtimeStamp)
 
+    def bytes_from_file(self,path):
+        byte = open(path, 'rb').read()
+        return byte
 
 
+
+
+    def GetAllIp(self):
+        allIp = self.dbConx.GetAlLIP()
+        packIp = b"#"
+        for row in allIp:
+            packIp += str(row['ip']).encode('unicode-escape') + b"#"
+
+        return packIp
