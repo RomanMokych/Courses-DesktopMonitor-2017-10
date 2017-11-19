@@ -7,6 +7,7 @@
 // TODO: reference any additional headers you need in STDAFX.H
 // and not in this file
 
+
 string GetName()
 {
 	char buffer[80];
