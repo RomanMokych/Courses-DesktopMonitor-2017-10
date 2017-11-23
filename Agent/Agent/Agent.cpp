@@ -38,7 +38,7 @@ int main()
 			dataStream << fin.rdbuf();
 			string data = dataStream.str();
 
-			fillPTree(root, "client", data.length());
+			fillPTree(root, "1QqatNFb", data.length());
 			//2.3 writing data of json structure into the string
 			ostringstream requestStream;
 			boost::property_tree::json_parser::write_json(requestStream, root);
@@ -58,7 +58,7 @@ int main()
 			{
 				cout << "Right responce - sending a file..." << endl;
 				//writing data string on server
-				boost::asio::write(sock, boost::asio::buffer(data, sizeof(data)));
+				boost::asio::write(sock, boost::asio::buffer(data, data.size()));
 				cout << "File is sent." << endl;
 			}
 			else
