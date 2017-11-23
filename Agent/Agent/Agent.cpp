@@ -30,10 +30,15 @@ int main()
 			string fileName = SaveScreenShot();
 			fstream fin(fileName, ios::in | ios::binary);// opening screen in binary format to send on server
 
-			//2.2 creating json structure to send on a server
+			//2.2 creating json structure and reading file in ostringstream to get data and size of the file
 			pt::ptree root;//element wich will be used to create a json string for request
-			fillPTree(root, "client", sizeof(fin));
+			
 
+			ostringstream dataStream;
+			dataStream << fin.rdbuf();
+			string data = dataStream.str();
+
+			fillPTree(root, "client", data.length());
 			//2.3 writing data of json structure into the string
 			ostringstream requestStream;
 			boost::property_tree::json_parser::write_json(requestStream, root);
@@ -52,12 +57,7 @@ int main()
 			if (a == 0)
 			{
 				cout << "Right responce - sending a file..." << endl;
-	
-				ostringstream dataStream;
-				dataStream << fin.rdbuf();
-				string data = dataStream.str();
-				
-
+				//writing data string on server
 				boost::asio::write(sock, boost::asio::buffer(data, sizeof(data)));
 				cout << "File is sent." << endl;
 			}
