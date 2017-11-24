@@ -3,6 +3,7 @@ from DataBase.DB_controller import Context
 import json
 import os
 import time
+
 from datetime import datetime
 
 class ScrPack:
@@ -15,48 +16,59 @@ class ServHandler(protocol.Protocol):
     catchFlag = False
     role = ""
 
+    curframe = list()
+    curVip = ""
+
     def __init__(self):
         self.pack = ScrPack()
 
     def dataReceived(self, data):
-        if self.catchFlag == False:
-            jmeta = json.loads(data)
-            self.ReceivedtAll(jmeta)
+        if self.catchFlag == True:
+            self.catchDatab(data)
             return
 
-        if self.role == 'client':
-            if self.RecivedClient(data):
-                self.parent.SaveData(self.pack)
-                self.EraseTmpData()
-
-        if self.role == 'viewer':
-            jmeta = json.loads(data)
-            paches = self.parent.dbConx.GetRangeFrames(jmeta['startT'], jmeta['endT'], jmeta['ip'])
-            self.sendFrames(paches)
-
-    def ReceivedtAll(self, jmeta):
+        jmeta = json.loads(data)
         token = jmeta['token']
         self.role = self.parent.dbConx.RoleInit(token).user_name
 
-        if self.role is not None:
-            self.catchFlag = True
-
         if self.role == 'client':
-            self.transport.write(b"00")
-            self.pack.klientIp = self.transport.getPeer().host
-            self.pack.size = int(jmeta['size'])
+            if self.catchFlag == False:
+                self.PrepareClientRec(jmeta)
+                return
 
         if self.role == 'viewer':
+            self.ReciveViewer(jmeta)
+
+    def catchDatab(self,data):
+        if self.RecivedClient(data):
+            self.parent.SaveData(self.pack)
+            self.EraseTmpData()
+
+    def PrepareClientRec(self,jmeta):
+        self.catchFlag = True
+        self.transport.write(b"00")
+        self.pack.klientIp = self.transport.getPeer().host
+        self.pack.size = int(jmeta['size'])
+
+
+    def ReciveViewer(self,jmeta):
+
+        if jmeta['F'] == 'getframes':
+            paches = self.parent.dbConx.GetRangeFrames(jmeta['startT'], jmeta['endT'], jmeta['ip'])
+            response = {'F': 'resFCount', 'count': len(paches)}
+            self.transport.write(json.dumps(response).encode('utf-8'))
+            self.curframe = paches
+            self.curVip = jmeta['ip']
+
+        if jmeta['F']== "getip":
             allIp = self.parent.GetAllIp()
-            self.transport.write(allIp)
-            print("send")
-            print(allIp)
+            self.transport.write(allIp.encode('utf-8'))
 
-    def sendFrames(self,paches,client_ip):
-        self.transport.write(len(paches))
+        if jmeta['F'] == "readyF":
+            self.sendFrame()
 
-        for p in paches:
-            full = self.parent.path+'/'+client_ip+'/'+p
+    def sendFrame(self):
+            full = self.parent.path+'/'+self.curVip+'/'+self.curframe.pop()+".PNG"
             self.transport.write(self.parent.bytes_from_file(full))
 
     def RecivedClient(self, data):
@@ -100,30 +112,29 @@ class DeskServer:
         if self.dbConx.IsClient(pack.klientIp) == False:
             self.dbConx.AddClient(pack.klientIp)
 
-        dtimeStamp = datetime.now()
-        dtimestr = int(time.mktime(datetime.now().timetuple()))
+        dtimestr = int(time.time())
+        allPass= self.path+str("/")+pack.klientIp + str("/") + str(dtimestr)+'.PNG'
 
-        allPass= self.path+str("/")+pack.klientIp + str("/") + str(dtimestr)+'.jpg' #jpg
-
-        print("need to Addd file")
         if not os.path.isfile(allPass):
             file = open(allPass, 'wb')
             file.write(bytearray(pack.bData))
             print("Add file")
 
-        self.dbConx.AddFrame(pack.klientIp, dtimeStamp)
+        self.dbConx.AddFrame(pack.klientIp, dtimestr)
 
     def bytes_from_file(self,path):
         byte = open(path, 'rb').read()
         return byte
 
-
-
-
     def GetAllIp(self):
         allIp = self.dbConx.GetAlLIP()
-        packIp = b"#"
-        for row in allIp:
-            packIp += str(row['ip']).encode('unicode-escape') + b"#"
+        jsLineIp = []
 
-        return packIp
+
+        for row in allIp:
+            jsLineIp.append({'ip': str(row['ip'])})
+
+        jspackIp = {'F': 'IpResult', 'list_ip': jsLineIp}
+
+        print(json.dumps(jspackIp))
+        return json.dumps(jspackIp)
