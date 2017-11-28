@@ -5,7 +5,7 @@
 #include <QObject>
 #include <QTcpSocket>
 #include <QAbstractSocket>
-#include <QDebug>
+#include <QDebug>           // //////////////////////////////////////
 #include <QGraphicsScene>
 #include <QMainWindow>
 class VClient:public QObject
@@ -13,38 +13,45 @@ class VClient:public QObject
     Q_OBJECT
 public:
     explicit VClient(QMainWindow *parent = 0);
-    void doConnect();
-    void writeGetFrames(const QString& startTime,
+    void DoConnect();
+    void WriteGetFrames(const QString& startTime,
                const QString& endTime,
                const QString&ip);
-    void writeGetIp();
-    void writeReadyF();
 
+    void WriteGetIp();
+    void WriteReadyF();
+    void WriteGetTimes();
+
+    bool Isconnected()const;
 public:
     QStringList ipList;
-    QList<QSharedPointer<QGraphicsScene>> scenes_;
-    QGraphicsView * view;
-
+    QStringList timeList;
+    QList<QSharedPointer<QGraphicsScene>> scenes;
 
 signals:
-    void test1();
+    void ReadDone();
+    void ChangeStatus(const QString text);
+    void ThrowError(const QString text);
+    void ReadIp();
+    void Load();
 
 public slots:
-    void connected();
-    void disconnected();
+    void Connected();
+    void Disconnected();
+    void ReadyRead();
 
-    void readyRead();
-    void bytesWritten(qint64 bytes);
+private slots:
+    void Clear();
+
 private:
-    QByteArray endPng;
-    QByteArray tmpFrame;
-    int count_frame;
-    const QString token= "JjFaZqOT";
+    QByteArray tmpFrame_;
+    int count_frame_;
     QSharedPointer<QTcpSocket> socket_;
     bool rFlag_= false;
-    bool readyToreadB= false;
-    int countSendb_ = 0;
+    const QByteArray endPng_ ="IEND";
+    const QString token= "JjFaZqOT";
 
-    int countstep= 0;//del
+private:
+    const QString UnixToLocal(const int& un);
 };
 #endif // CLIENT_H

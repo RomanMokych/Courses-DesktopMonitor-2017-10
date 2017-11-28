@@ -1,36 +1,45 @@
 #include "client.h"
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QTcpSocket>
-#include <string.h>
-#include <qcombobox.h>
-#include <QJsonObject>
 #include <QJsonArray>
+#include <QDateTime>
+
 VClient::VClient(QMainWindow *parent)
 {
     this->setParent(parent);
 }
 
-void VClient::doConnect()
+void VClient::DoConnect()
 {
     this->socket_.reset( new QTcpSocket(this));
+    this->socket_->setReadBufferSize(200000);
 
-    connect(this->socket_.data(), SIGNAL(connected()),this, SLOT(connected()));
-    connect(this->socket_.data(), SIGNAL(disconnected()),this, SLOT(disconnected()));
-    connect(this->socket_.data(), SIGNAL(bytesWritten(qint64)),this, SLOT(bytesWritten(qint64)));
-    connect(this->socket_.data(), SIGNAL(readyRead()),this, SLOT(readyRead()));
+
+    connect(this->socket_.data(), SIGNAL(connected()),this, SLOT(Connected()));
+    connect(this->socket_.data(), SIGNAL(disconnected()),this, SLOT(Disconnected()));
+    //connect(this->socket_.data(), SIGNAL(bytesWritten(qint64)),this, SLOT(BytesWritten(qint64)));
+    connect(this->socket_.data(), SIGNAL(readyRead()),this, SLOT(ReadyRead()));
 
     socket_->connectToHost("127.0.0.1",8000);
 
     if(!socket_->waitForConnected(5000))
     {
-        qDebug() << "Error: " << socket_->errorString();
+        emit this->ThrowError(socket_->errorString());
+        return;
     }
-
-    this->endPng = QByteArray("IEND");
+    emit this->ChangeStatus("connect");
+}
+bool VClient::Isconnected()const
+{
+    if(this->socket_->isOpen())
+    {
+        return true;
+    }
+    else
+        return false;
 }
 
-void VClient::writeGetFrames(const QString& startTime,
+void VClient::WriteGetFrames(const QString& startTime,
                     const QString& endTime,
                     const QString&ip)
 {
@@ -46,7 +55,7 @@ void VClient::writeGetFrames(const QString& startTime,
     this->socket_->write(doc.toJson());
 }
 
-void VClient::writeGetIp()
+void VClient::WriteGetIp()
 {
     QJsonObject msg;
     msg.insert("token",this->token);
@@ -56,14 +65,23 @@ void VClient::writeGetIp()
     this->socket_->write(doc.toJson());
 }
 
-void VClient::connected()
+void VClient::Connected()
 {
     qDebug() << "connected...";
-    this->writeGetIp();
+    this->WriteGetIp();
 
 }
 
-void VClient::writeReadyF()
+void VClient::WriteGetTimes()
+{
+     QJsonObject msg;
+     msg.insert("token",this->token);
+     msg.insert("F","gettime");
+     QJsonDocument doc(msg);
+     this->socket_->write(doc.toJson());
+}
+
+void VClient::WriteReadyF()
 {
      QJsonObject msg;
      msg.insert("token",this->token);
@@ -71,16 +89,29 @@ void VClient::writeReadyF()
      QJsonDocument doc(msg);
      this->socket_->write(doc.toJson());
 }
-void VClient::disconnected()
-{
 
-}
-void VClient::bytesWritten(qint64 bytes)
+void VClient::Disconnected()
 {
-
+    emit this->ThrowError("Error connection");
 }
 
-void VClient::readyRead()
+void VClient::Clear()
+{
+    this->ipList.clear();
+    this->timeList.clear();
+    this->scenes.clear();
+}
+
+const QString VClient::UnixToLocal(const int& un)
+{
+    QDateTime timeStamp;
+    timeStamp.setTime_t(un);
+    QString strTime = timeStamp.toString("ddd MMMM d yy hh:mm:ss");
+
+    return strTime;
+}
+
+void VClient::ReadyRead()
 {
     QByteArray recvd= socket_->readAll();
 
@@ -95,27 +126,51 @@ void VClient::readyRead()
            QJsonObject obj = val.toObject();
           this->ipList.append(obj.value("ip").toString());
        }
-
+        emit this->ReadIp();
         return;
     }
-    else if(msg.object().value("F") == "resFCount")
+    else if(msg.object().value("F") == "FRinfo")
     {
         QJsonValue val = msg.object().value("count");
-        this->count_frame = val.toInt();
-        qDebug() <<this->count_frame;
+        this->count_frame_ = val.toInt();
+        if(!this->count_frame_)
+        {
+            emit this->ChangeStatus("Empty");
+            return;
+        }
         this->rFlag_ = true;
-        this->writeReadyF();
+
+        emit this->Load();
+
+        this->WriteGetTimes();
+    }
+    else if(msg.object().value("F")== "resTime")
+    {
+        QJsonValue jval = msg.object().value("timeList");
+        QJsonArray iparr = jval.toArray();
+
+        foreach (const QJsonValue &val, iparr) {
+
+           int unixTime = val.toString().toInt();
+           QString time = this->UnixToLocal(unixTime);
+           this->timeList.append(time);
+        }
+
+        this->WriteReadyF();
     }
     else if(this->rFlag_)
     {
 
-        this->tmpFrame+= recvd;
+        this->tmpFrame_+= recvd;
         bool end_file = true;
 
-        this->countstep++;// ///////////////////
-        for(int i=recvd.size()-5, n=this->endPng.size()-1;n!=0;--i,--n)
+        for(int i=recvd.size()-5, n=this->endPng_.size()-1;n!=0;--i,--n)
         {
-            if((recvd.at(i)) != this->endPng[n])
+            if(i<5)
+            {
+                break;
+            }
+            if((recvd.at(i)) != this->endPng_[n])
             {
                 end_file= false;
                 break;
@@ -129,19 +184,26 @@ void VClient::readyRead()
 
         QSharedPointer<QGraphicsScene> sc(new QGraphicsScene());
         QPixmap p;
-        p.loadFromData(this->tmpFrame.data(),"PNG");
-        sc->addPixmap(p);
-        this->scenes_.append(sc);
 
-        this->count_frame--;
-        if(!this->count_frame)
+        p.loadFromData(this->tmpFrame_,"PNG");
+        sc->addPixmap(p);
+
+        this->scenes.append(sc);
+
+        qDebug() <<  this->count_frame_;
+
+        this->count_frame_--;
+        if(!this->count_frame_)
         {
             this->rFlag_ = false;
-            this->tmpFrame.clear();
+            this->tmpFrame_.clear();
+            emit this->ReadDone();
         }
         else
-            this->tmpFrame.clear();
-            this->writeReadyF();
+        {
+            this->tmpFrame_.clear();
+            this->WriteReadyF();
+        }
 
     }
 }

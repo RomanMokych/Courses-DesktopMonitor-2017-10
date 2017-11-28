@@ -15,18 +15,26 @@ public:
     VClient client;
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
+    void Init();
+
+signals:
+    void Clear();
 
 public slots:
-       void test2();
+       void Set_scene();
+       void SetStatus(const QString text);
+       void SetError(const QString text);
+       void SetIp();
+       void LoadStart();
 
 private slots:
-
     void on_pushButton_clicked();
-
     void on_pushButton_Show_clicked();
+    void on_horizontalSlider_ch_sliderMoved(int position);
+
 private:
     Ui::MainWindow *ui;
-
+    QSharedPointer<QGraphicsScene> loadScene_;
 };
 
 #endif // MAINWINDOW_H
