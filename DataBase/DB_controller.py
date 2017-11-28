@@ -86,8 +86,6 @@ class Context:
 
     def GetClient(self, ip):
         self.StartSession()
-        #query = "select * from Client where ip = '%s'"%ip
-        #select_cl = self.session.execute(query)
 
         select_client = self.session.query(Client).filter_by(ip=ip).first()
         self.EndSession()
@@ -103,7 +101,6 @@ class Context:
     def GetRangeFrames(self, startTime, endTime, clientip):
         self.StartSession()
         client_id = self.GetClient(clientip).id_client
-        #print(client_id)
 
         query = "select time from Frame where time BETWEEN %s and %s  and client_id='%d'"%(startTime,endTime, client_id)
 
