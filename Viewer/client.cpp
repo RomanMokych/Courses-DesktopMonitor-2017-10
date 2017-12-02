@@ -4,6 +4,21 @@
 #include <QJsonArray>
 #include <QDateTime>
 
+namespace
+{
+    const QByteArray END_PNG ="IEND";
+
+    //todo: move to config or generate on server
+    const QString TOKEN= "JjFaZqOT";
+    const QString HOST = "127.0.0.1";
+    const size_t PORT = 8000;
+    const size_t WAIT_TIMEOUT = 5000;
+    const size_t SOCKET_BUFFER_SIZE = 200000;
+
+    //Commands on server
+    //"IpResult"
+}
+
 VClient::VClient(QMainWindow *parent)
 {
     this->setParent(parent);
@@ -12,17 +27,17 @@ VClient::VClient(QMainWindow *parent)
 void VClient::DoConnect()
 {
     this->socket_.reset( new QTcpSocket(this));
-    this->socket_->setReadBufferSize(200000);
-
+    this->socket_->setReadBufferSize(SOCKET_BUFFER_SIZE);
 
     connect(this->socket_.data(), SIGNAL(connected()),this, SLOT(Connected()));
     connect(this->socket_.data(), SIGNAL(disconnected()),this, SLOT(Disconnected()));
     //connect(this->socket_.data(), SIGNAL(bytesWritten(qint64)),this, SLOT(BytesWritten(qint64)));
     connect(this->socket_.data(), SIGNAL(readyRead()),this, SLOT(ReadyRead()));
 
-    socket_->connectToHost("127.0.0.1",8000);
 
-    if(!socket_->waitForConnected(5000))
+    socket_->connectToHost(HOST, PORT);
+
+    if(!socket_->waitForConnected(WAIT_TIMEOUT))
     {
         emit this->ThrowError(socket_->errorString());
         return;
@@ -44,7 +59,7 @@ void VClient::WriteGetFrames(const QString& startTime,
                     const QString&ip)
 {
     QJsonObject msg;
-    msg.insert("token",this->token);
+    msg.insert("token", TOKEN);
     msg.insert("F","getframes");
 
     msg.insert("startT",startTime);
@@ -58,7 +73,7 @@ void VClient::WriteGetFrames(const QString& startTime,
 void VClient::WriteGetIp()
 {
     QJsonObject msg;
-    msg.insert("token",this->token);
+    msg.insert("token", TOKEN);
     msg.insert("F","getip");
 
     QJsonDocument doc(msg);
@@ -75,8 +90,8 @@ void VClient::Connected()
 void VClient::WriteGetTimes()
 {
      QJsonObject msg;
-     msg.insert("token",this->token);
-     msg.insert("F","gettime");
+     msg.insert("token", TOKEN);
+     msg.insert("F", "gettime");
      QJsonDocument doc(msg);
      this->socket_->write(doc.toJson());
 }
@@ -84,8 +99,8 @@ void VClient::WriteGetTimes()
 void VClient::WriteReadyF()
 {
      QJsonObject msg;
-     msg.insert("token",this->token);
-     msg.insert("F","readyF");
+     msg.insert("token", TOKEN);
+     msg.insert("F", "readyF");
      QJsonDocument doc(msg);
      this->socket_->write(doc.toJson());
 }
@@ -113,6 +128,10 @@ const QString VClient::UnixToLocal(const int& un)
 
 void VClient::ReadyRead()
 {
+    /////////////////////////////////
+    //todo: move commands to constants
+    /////////////////////////////////
+
     QByteArray recvd= socket_->readAll();
 
     QJsonDocument msg= QJsonDocument::fromJson(recvd);
@@ -164,13 +183,13 @@ void VClient::ReadyRead()
         this->tmpFrame_+= recvd;
         bool end_file = true;
 
-        for(int i=recvd.size()-5, n=this->endPng_.size()-1;n!=0;--i,--n)
+        for(int i=recvd.size()-5, n=END_PNG.size()-1;n!=0;--i,--n)
         {
             if(i<5)
             {
                 break;
             }
-            if((recvd.at(i)) != this->endPng_[n])
+            if((recvd.at(i)) != END_PNG[n])
             {
                 end_file= false;
                 break;

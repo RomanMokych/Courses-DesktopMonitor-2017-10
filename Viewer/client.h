@@ -8,6 +8,7 @@
 #include <QDebug>           // //////////////////////////////////////
 #include <QGraphicsScene>
 #include <QMainWindow>
+
 class VClient:public QObject
 {
     Q_OBJECT
@@ -48,8 +49,7 @@ private:
     int count_frame_;
     QSharedPointer<QTcpSocket> socket_;
     bool rFlag_= false;
-    const QByteArray endPng_ ="IEND";
-    const QString token= "JjFaZqOT";
+
 
 private:
     const QString UnixToLocal(const int& un);
