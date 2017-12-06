@@ -1,6 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include <QObject>              //
+#include <QObject>
 #include <QGraphicsPixmapItem>
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -8,16 +8,16 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    QObject::connect(&client,SIGNAL(ReadDone()),
+    connect(&client,SIGNAL(ReadDone()),
                          this,SLOT(Set_scene()));
 
-    QObject::connect(this,SIGNAL(Clear()),
+    connect(this,SIGNAL(Clear()),
                      &this->client,SLOT(Clear()));
 
-    QObject::connect(&this->client,SIGNAL(ChangeStatus(QString)),
+    connect(&this->client,SIGNAL(ChangeStatus(QString)),
                      this,SLOT(SetStatus(QString)));
 
-    QObject::connect(&this->client,SIGNAL(ThrowError(QString)),
+    connect(&this->client,SIGNAL(ThrowError(QString)),
                      this,SLOT(SetError(QString)));
 
     connect(&client,SIGNAL(ReadIp()),
@@ -101,18 +101,24 @@ void MainWindow::on_pushButton_Show_clicked()
 
 void MainWindow::Set_scene()
 {
-    this->ui->label_time->setText(this->client.timeList[0]);
+    this->currentScene_.reset(new QGraphicsScene());
+    this->currentScene_->addPixmap(this->client.frames.first().GetPmap());
+
+    this->ui->label_time->setText(this->client.frames.first().GetTime());
     this->ui->horizontalSlider_ch->setEnabled(true);
-    this->ui->graphicsView_frames->setScene(this->client.scenes[0].data());
-    this->ui->horizontalSlider_ch->setMaximum(this->client.scenes.count()-1);
+    this->ui->graphicsView_frames->setScene(this->currentScene_.data());
+    this->ui->horizontalSlider_ch->setMaximum(this->client.frames.count()-1);
     this->ui->horizontalSlider_ch->setMinimum(0);
 
 }
 
 void MainWindow::on_horizontalSlider_ch_sliderMoved(int position)
 {
-    this->ui->graphicsView_frames->setScene(this->client.scenes[position].data());
-    this->ui->label_time->setText(this->client.timeList[position]);
+    this->currentScene_.reset(new QGraphicsScene());
+    this->currentScene_->addPixmap(this->client.frames[position].GetPmap());
+
+    this->ui->graphicsView_frames->setScene(this->currentScene_.data());
+    this->ui->label_time->setText(this->client.frames[position].GetTime());
 }
 
 

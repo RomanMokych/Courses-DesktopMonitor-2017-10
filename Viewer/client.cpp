@@ -3,21 +3,9 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QDateTime>
+#include <QPainter>
+#include <QImage>
 
-namespace
-{
-    const QByteArray END_PNG ="IEND";
-
-    //todo: move to config or generate on server
-    const QString TOKEN= "JjFaZqOT";
-    const QString HOST = "127.0.0.1";
-    const size_t PORT = 8000;
-    const size_t WAIT_TIMEOUT = 5000;
-    const size_t SOCKET_BUFFER_SIZE = 200000;
-
-    //Commands on server
-    //"IpResult"
-}
 
 VClient::VClient(QMainWindow *parent)
 {
@@ -27,17 +15,15 @@ VClient::VClient(QMainWindow *parent)
 void VClient::DoConnect()
 {
     this->socket_.reset( new QTcpSocket(this));
-    this->socket_->setReadBufferSize(SOCKET_BUFFER_SIZE);
+    this->socket_->setReadBufferSize(vconfig::SOCKET_BUFFER_SIZE);
 
     connect(this->socket_.data(), SIGNAL(connected()),this, SLOT(Connected()));
     connect(this->socket_.data(), SIGNAL(disconnected()),this, SLOT(Disconnected()));
-    //connect(this->socket_.data(), SIGNAL(bytesWritten(qint64)),this, SLOT(BytesWritten(qint64)));
     connect(this->socket_.data(), SIGNAL(readyRead()),this, SLOT(ReadyRead()));
 
+    socket_->connectToHost(vconfig::HOST, vconfig::PORT);
 
-    socket_->connectToHost(HOST, PORT);
-
-    if(!socket_->waitForConnected(WAIT_TIMEOUT))
+    if(!socket_->waitForConnected(vconfig::WAIT_TIMEOUT))
     {
         emit this->ThrowError(socket_->errorString());
         return;
@@ -59,22 +45,12 @@ void VClient::WriteGetFrames(const QString& startTime,
                     const QString&ip)
 {
     QJsonObject msg;
-    msg.insert("token", TOKEN);
-    msg.insert("F","getframes");
+    msg.insert(qParam::TOKEN, vconfig::TOKEN);
+    msg.insert(qParam::FUNC,GETFRAMESINFO);
 
-    msg.insert("startT",startTime);
-    msg.insert("endT",endTime);
-    msg.insert("ip",ip);
-
-    QJsonDocument doc(msg);
-    this->socket_->write(doc.toJson());
-}
-
-void VClient::WriteGetIp()
-{
-    QJsonObject msg;
-    msg.insert("token", TOKEN);
-    msg.insert("F","getip");
+    msg.insert(qParam::STARTT,startTime);
+    msg.insert(qParam::ENDT,endTime);
+    msg.insert(qParam::IP,ip);
 
     QJsonDocument doc(msg);
     this->socket_->write(doc.toJson());
@@ -82,148 +58,215 @@ void VClient::WriteGetIp()
 
 void VClient::Connected()
 {
-    qDebug() << "connected...";
-    this->WriteGetIp();
+    this->SendJSonMessage(GETIP);
 
 }
-
-void VClient::WriteGetTimes()
+void VClient::SendJSonMessage(const viewerCommand f)
 {
-     QJsonObject msg;
-     msg.insert("token", TOKEN);
-     msg.insert("F", "gettime");
-     QJsonDocument doc(msg);
-     this->socket_->write(doc.toJson());
-}
-
-void VClient::WriteReadyF()
-{
-     QJsonObject msg;
-     msg.insert("token", TOKEN);
-     msg.insert("F", "readyF");
-     QJsonDocument doc(msg);
-     this->socket_->write(doc.toJson());
+    QJsonObject msg;
+    msg.insert(qParam::FUNC, vconfig::TOKEN);
+    msg.insert(qParam::FUNC, f);
+    QJsonDocument doc(msg);
+    this->socket_->write(doc.toJson());
 }
 
 void VClient::Disconnected()
 {
-    emit this->ThrowError("Error connection");
+    emit this->ThrowError(guimsg::ERCONN);
 }
 
 void VClient::Clear()
 {
-    this->ipList.clear();
-    this->timeList.clear();
-    this->scenes.clear();
+ this->frames.clear();
 }
 
 const QString VClient::UnixToLocal(const int& un)
 {
     QDateTime timeStamp;
     timeStamp.setTime_t(un);
-    QString strTime = timeStamp.toString("ddd MMMM d yy hh:mm:ss");
+    QString strTime = timeStamp.toString(vconfig::TIMEFORMAT);
 
     return strTime;
 }
-
-void VClient::ReadyRead()
+void VClient::ReciveIpResult(const QJsonDocument& msg)
 {
-    /////////////////////////////////
-    //todo: move commands to constants
-    /////////////////////////////////
+    QJsonValue jval = msg.object().value(qParam::LISTIP);
+    QJsonArray iparr = jval.toArray();
 
-    QByteArray recvd= socket_->readAll();
+    foreach (const QJsonValue &val, iparr) {
+        QJsonObject obj = val.toObject();
+       this->ipList.append(obj.value(qParam::IP).toString());
+    }
+     emit this->ReadIp();
+}
 
-    QJsonDocument msg= QJsonDocument::fromJson(recvd);
+void VClient::ReciveFrameInfo(const QJsonDocument& msg)
+{
+    QJsonValue Fval = msg.object().value(qParam::SIZE);
+    QJsonValue Ftime = msg.object().value(qParam::TIME);
+    QJsonValue partCount = msg.object().value(qParam::PARTCOUNT);
+    this->count_tmpPartFrame_ = partCount.toInt();
+    this->countWaitRead_ = Fval.toInt();
 
-    if(msg.object().value("F") == "IpResult")
+    int unixTime = Ftime.toInt();
+    QString localtime = this->UnixToLocal(unixTime);
+    this->tmpFrame.SetTime(localtime);
+
+    this->SendJSonMessage(READYF);
+    this->rFFlag_ = true;
+}
+
+void VClient::RecivePartInfo(const QJsonDocument& msg)
+{
+    QJsonValue Psize = msg.object().value(qParam::SIZE);
+    QJsonValue Ptime = msg.object().value(qParam::TIME);
+    QJsonValue Pposx = msg.object().value(qParam::POSX);
+    QJsonValue Pposy = msg.object().value(qParam::POSY);
+
+    this->tmpFrameX_ = Pposx.toInt();
+    this->tmpFrameY_ = Pposy.toInt();
+    this->countWaitRead_ = Psize.toInt();
+
+    int unixTime = Ptime.toInt();
+    QString localtime = this->UnixToLocal(unixTime);
+    this->tmpFrame.SetTime(localtime);
+
+    this->SendJSonMessage(READYP);
+    this->rPflag_= true;
+}
+
+void VClient::ReciveFramesInfo(const QJsonDocument& msg)
+{
+    QJsonValue Fval = msg.object().value(qParam::FCOUNT);
+    this->count_frame_ = Fval.toInt();
+    if(!this->count_frame_)
     {
-       QJsonValue jval = msg.object().value("list_ip");
-       QJsonArray iparr = jval.toArray();
-
-       foreach (const QJsonValue &val, iparr) {
-           QJsonObject obj = val.toObject();
-          this->ipList.append(obj.value("ip").toString());
-       }
-        emit this->ReadIp();
+        emit this->ChangeStatus(guimsg::EMPTY);
         return;
     }
-    else if(msg.object().value("F") == "FRinfo")
+
+    emit this->Load();
+
+    this->SendJSonMessage(GETFINFO);
+}
+
+void VClient::RecivePart(const QByteArray& buff)
+{
+    this->tmpFrameBuff_ +=buff;
+    if(this->tmpFrameBuff_.size()< this->countWaitRead_)
     {
-        QJsonValue val = msg.object().value("count");
-        this->count_frame_ = val.toInt();
-        if(!this->count_frame_)
-        {
-            emit this->ChangeStatus("Empty");
-            return;
-        }
-        this->rFlag_ = true;
-
-        emit this->Load();
-
-        this->WriteGetTimes();
+        return;
     }
-    else if(msg.object().value("F")== "resTime")
+
+    this->MatchImages();
+
+    this->rPflag_ = false;
+    this->count_tmpPartFrame_--;
+    if(!this->count_tmpPartFrame_)
     {
-        QJsonValue jval = msg.object().value("timeList");
-        QJsonArray iparr = jval.toArray();
+        this->tmpFrameBuff_.clear();
 
-        foreach (const QJsonValue &val, iparr) {
-
-           int unixTime = val.toString().toInt();
-           QString time = this->UnixToLocal(unixTime);
-           this->timeList.append(time);
-        }
-
-        this->WriteReadyF();
-    }
-    else if(this->rFlag_)
-    {
-
-        this->tmpFrame_+= recvd;
-        bool end_file = true;
-
-        for(int i=recvd.size()-5, n=END_PNG.size()-1;n!=0;--i,--n)
+        if(this->count_frame_)
         {
-            if(i<5)
-            {
-                break;
-            }
-            if((recvd.at(i)) != END_PNG[n])
-            {
-                end_file= false;
-                break;
-            }
-        }
-
-        if(end_file==false)
-        {
-            return;
-        }
-
-        QSharedPointer<QGraphicsScene> sc(new QGraphicsScene());
-        QPixmap p;
-
-        p.loadFromData(this->tmpFrame_,"PNG");
-        sc->addPixmap(p);
-
-        this->scenes.append(sc);
-
-        qDebug() <<  this->count_frame_;
-
-        this->count_frame_--;
-        if(!this->count_frame_)
-        {
-            this->rFlag_ = false;
-            this->tmpFrame_.clear();
-            emit this->ReadDone();
+            this->SendJSonMessage(GETFINFO);
+            this->rPflag_ = false;
         }
         else
         {
-            this->tmpFrame_.clear();
-            this->WriteReadyF();
+            emit this->ReadDone();
+            return;
+        }
+    }
+    else
+    this->SendJSonMessage(GETPINFO);
+}
+void VClient::MatchImages()
+{
+    QImage sourceImage;
+    sourceImage.loadFromData(this->tmpFrameBuff_,vconfig::IMFORMAT);
+    QImage resultImage = this->frames.last().GetPmap().toImage();
+
+    for(int x = this->tmpFrameX_; x < this->tmpFrameX_ + sourceImage.width(); x++)
+        {
+            for(int y  = this->tmpFrameY_; y < this->tmpFrameY_ + sourceImage.height(); y++)
+            {
+                resultImage.setPixel(x, y, sourceImage.pixel(x - this->tmpFrameX_, y - this->tmpFrameY_));
+            }
         }
 
+    QPixmap p = QPixmap::fromImage(resultImage);
+
+    this->tmpFrame.SetPmap(p);
+    this->tmpFrameBuff_.clear();
+    this->frames.append(this->tmpFrame);
+
+}
+void VClient::ReciveFrame(const QByteArray& buff)
+{
+    this->tmpFrameBuff_+= buff;
+    if(this->tmpFrameBuff_.size() < this->countWaitRead_)
+    {
+        return;
+    }
+
+    this->tmpFrame.SetPmap(this->tmpFrameBuff_);
+    this->tmpFrameBuff_.clear();
+    this->frames.append(this->tmpFrame);
+    this->lastFIndex = this->frames.count()-1;
+
+    this->count_frame_--;
+    this->rFFlag_ = false;
+    this->tmpFrameBuff_.clear();
+    if(this->count_tmpPartFrame_)
+    {
+        this->SendJSonMessage(GETPINFO);
+    }
+    else
+    {
+        if(!this->count_frame_)
+        {
+
+            emit this->ReadDone();
+        }
+        else
+            this->SendJSonMessage(GETFINFO);
     }
 }
+void VClient::ReadyRead()
+{
+    QByteArray recvd= socket_->readAll();
 
+    if(this->rPflag_)
+    {
+        this->RecivePart(recvd);
+        return;
+    }
+    else if(this->rFFlag_)
+    {
+        this->ReciveFrame(recvd);
+        return;
+    }
+
+    QJsonDocument msg= QJsonDocument::fromJson(recvd);
+
+    QString message = msg.object().value(qParam::FUNC).toString();
+
+    int ms = msg.object().value(qParam::FUNC).toInt();
+
+    switch (ms) {
+    case RESIP:
+        this->ReciveIpResult(msg);
+        break;
+    case RESFINFO:
+        this->ReciveFrameInfo(msg);
+        break;
+    case RESPINFO:
+         this->RecivePartInfo(msg);
+        break;
+    case RESFRAMESINFO:
+         this->ReciveFramesInfo(msg);
+        break;
+    default:
+        break;
+    }
+}
