@@ -1,41 +1,46 @@
 from twisted.internet import reactor, protocol
-from DataBase.DB_controller import Context
+from DataBase.DBcontext import Context
 import json
 import os
 import time
+from Server.CommandDescription import *
+from Server.config import ServerConf
 
 class ScrPack:
     bData = list()
     klientIp = 0
     size = 0
     countRead = 0
+    fstatus = Fstatus.NEW
+    posx = 0
+    posy = 0
 
 class ServHandler(protocol.Protocol):
     catchFlag = False
     pack = ScrPack()
     role = ""
-
     curframes = list()
+    curPFrames = list(list())
     curVip = ""
 
     def dataReceived(self, data):
-        if self.catchFlag == True:
-            self.catchDatab(data)
+        if self.catchFlag:
+            self.CatchDatab(data)
             return
 
         jmeta = json.loads(data)
-        token = jmeta['token']
+        token = jmeta[CmdPr.TOK.value]
         self.role = self.parent.dbConx.RoleInit(token).user_name
 
-        if self.role == 'client':
-            if self.catchFlag == False:
+        if self.role == CmdPr.CLIENT.value:
+            if not self.catchFlag:
                 self.PrepareClientRec(jmeta)
                 return
 
-        if self.role == 'viewer':
+        if self.role == CmdPr.VW.value:
             self.ReciveViewer(jmeta)
 
-    def catchDatab(self, data):
+    def CatchDatab(self, data):
         if self.RecivedClient(data):
             self.parent.SaveData(self.pack)
             self.EraseTmpData()
@@ -44,39 +49,74 @@ class ServHandler(protocol.Protocol):
         self.catchFlag = True
         self.transport.write(b"00")
         self.pack.klientIp = self.transport.getPeer().host
-        self.pack.size = int(jmeta['size'])
+        self.pack.size = int(jmeta[CmdPr.SIZE.value])
+        self.pack.fstatus = int(jmeta[CmdPr.SIZE.value])
 
+        if int(jmeta['status']) == Fstatus.CHANGE.value:
+            self.pack.posx = int(jmeta[CmdPr.PX.value])
+            self.pack.posy = int(jmeta[CmdPr.PY.value])
 
     def ReciveViewer(self, jmeta):
 
-        if jmeta['F'] == 'getframes':
-            paches = self.parent.dbConx.GetRangeFrames(jmeta['startT'], jmeta['endT'], jmeta['ip'])
-            response = {'F': 'FRinfo', 'count': len(paches)}
-            self.transport.write(json.dumps(response).encode('utf-8'))
-            self.curframes = paches
-            self.curVip = jmeta['ip']
+        if jmeta['F'] == viewerCommand.GETFRAMESINFO.value:
+            (frames, parts) = self.parent.dbConx.GetRangeFrames(jmeta[CmdPr.STIME.value],
+                                                                jmeta[CmdPr.ETIME.value],
+                                                                jmeta[CmdPr.IP.value])
+            self.curframes = frames
+            self.curPFrames = parts
 
-        if jmeta['F']== "getip":
+            response = {CmdPr.SFUNC.value: ServerCommand.RESFRAMESINFO.value, CmdPr.FCOUNT.value: len(self.curframes)}
+            self.Write(response)
+            self.curVip = jmeta[CmdPr.IP.value]
+
+        if jmeta[CmdPr.SFUNC.value] == viewerCommand.GETFINFO.value:
+            full = self.parent.path + '/' + self.curVip + '/' + self.curframes[0] + ServerConf.IMAGEFORMAT
+            size = os.path.getsize(full)
+
+            response = {CmdPr.SFUNC.value: ServerCommand.RESFINFO.value,
+                        CmdPr.SIZE.value: size,
+                        CmdPr.TIME.value: self.curframes[0],
+                        CmdPr.PCOUNT.value: len(self.curPFrames[0])}
+
+            self.Write(response)
+
+        if jmeta[CmdPr.SFUNC.value] == viewerCommand.GETPINFO.value:
+            full = self.parent.path + '/' + self.curVip + '/' + str(self.curPFrames[0][0].time) + ServerConf.IMAGEFORMAT
+            size = os.path.getsize(full)
+            response = {CmdPr.SFUNC.value: ServerCommand.RESPINFO.value,
+                        CmdPr.SIZE.value: size,
+                        CmdPr.TIME.value: str(self.curPFrames[0][0].time),
+                        CmdPr.PX.value: self.curPFrames[0][0].Posx,
+                        CmdPr.PY.value: self.curPFrames[0][0].Posy}
+
+            self.Write(response)
+
+        if jmeta[CmdPr.SFUNC.value] == viewerCommand.GETIP.value:
             allIp = self.parent.GetAllIp()
             self.transport.write(allIp.encode('utf-8'))
 
-        if jmeta['F'] == "readyF":
-            self.sendFrame()
+        if jmeta[CmdPr.SFUNC.value] == viewerCommand.READYF.value:
+            self.SendFrame()
 
-        if jmeta['F'] == "gettime":
-            jtime = self.getJtime()
-            response = json.dumps(jtime).encode('utf-8')
-            self.transport.write(response)
+        if jmeta[CmdPr.SFUNC.value] == viewerCommand.READYP.value:
+            self.SendPart()
 
-    def getJtime(self):
-        jspackIp = {'F': 'resTime', 'timeList': self.curframes}
-        return jspackIp
+    def Write(self, response):
+        self.transport.write(json.dumps(response).encode('utf-8'))
 
-    def sendFrame(self):
+    def SendPart(self):
+        if len(self.curPFrames) == 0:
+            return
+
+        full = self.parent.path + '/' + self.curVip + '/' + str(self.curPFrames[0].pop(0).time) + ServerConf.IMAGEFORMAT
+        file = self.parent.bytes_from_file(full)
+        self.transport.write(file)
+
+    def SendFrame(self):
         if len(self.curframes) == 0:
             return
 
-        full = self.parent.path+'/'+self.curVip+'/'+self.curframes.pop(0)+".PNG"
+        full = self.parent.path+'/'+self.curVip+'/'+self.curframes.pop(0)+ ServerConf.IMAGEFORMAT
         file = self.parent.bytes_from_file(full)
         self.transport.write(file)
 
@@ -95,10 +135,11 @@ class ServHandler(protocol.Protocol):
         self.pack.countRead =0
 
     def connectionMade(self):
-        pass
+        print("connection")
 
     def connectionLost(self, reason):
         print("connection lost", reason)
+
 
 class DeskServer:
     def __init__(self, dbConStr, mainPath, port):
@@ -118,21 +159,24 @@ class DeskServer:
         if not os.path.isdir(self.path + str("/") + pack.klientIp):
             os.makedirs(self.path + str("/") + pack.klientIp)
 
-        if self.dbConx.IsClient(pack.klientIp) == False:
+        if not self.dbConx.IsClient(pack.klientIp):
             self.dbConx.AddClient(pack.klientIp)
 
         dtimestr = int(time.time())
-        allPass= self.path+str("/")+pack.klientIp + str("/") + str(dtimestr)+'.PNG'
+        allPass= self.path+str("/")+pack.klientIp + str("/") + str(dtimestr)+ ServerConf.IMAGEFORMAT
 
         if not os.path.isfile(allPass):
             file = open(allPass, 'wb')
             file.write(bytearray(pack.bData))
-            print("Add file")
 
-        self.dbConx.AddFrame(pack.klientIp, dtimestr)
+        if pack.fstatus == Fstatus.CHANGE.value:
+            self.dbConx.AddPart(str(dtimestr), pack.klientIp, pack.posx, pack.posy)
 
-    def bytes_from_file(self,path):
-        file = open(path,'rb')
+        else:
+            self.dbConx.AddFrame(pack.klientIp, dtimestr)
+
+    def bytes_from_file(self, path):
+        file = open(path, 'rb')
         byte =file.read()
         return byte
 
@@ -141,9 +185,8 @@ class DeskServer:
         jsLineIp = []
 
         for row in allIp:
-            jsLineIp.append({'ip': str(str(row['ip']))})
+            jsLineIp.append({CmdPr.IP.value: str(str(row[CmdPr.IP.value]))})
 
-        jspackIp = {'F': 'IpResult', 'list_ip': jsLineIp}
+        jspackIp = {CmdPr.SFUNC.value: ServerCommand.RESIP.value, CmdPr.LISTIP.value: jsLineIp}
 
-        print(json.dumps(jspackIp))
         return json.dumps(jspackIp)
