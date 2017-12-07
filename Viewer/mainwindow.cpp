@@ -25,13 +25,10 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(&client,SIGNAL(Load()),
             this,SLOT(LoadStart()));
-
-
-
 }
 void MainWindow::Init()
 {
-    this->ui->comboBoxIpList->insertItems(0,this->client.ipList);
+    this->ui->comboBoxIpList->insertItems(0,this->client.ip);
     this->ui->dateEdit_start->setDate(QDate::currentDate());
     this->ui->dateEdit_end->setDate(QDate::currentDate());
     this->ui->timeEdit_start->setTime(QTime::currentTime());
@@ -44,7 +41,7 @@ MainWindow::~MainWindow()
 }
 void MainWindow::SetIp()
 {
-    this->ui->comboBoxIpList->insertItems(0,this->client.ipList);
+    this->ui->comboBoxIpList->insertItems(0,this->client.ip);
 }
 void MainWindow::SetStatus(const QString text)
 {
@@ -62,23 +59,23 @@ void MainWindow::SetError(const QString text)
     pal.setColor(QPalette::WindowText, Qt::red);
     this->ui->label_status->setPalette(pal);
 
-    this->loadScene_.reset();
+    this->load_scene_.reset();
 }
 void MainWindow::on_pushButton_clicked()
 {
     this->client.DoConnect();
-    this->ui->comboBoxIpList->insertItems(0,this->client.ipList);
+    this->ui->comboBoxIpList->insertItems(0,this->client.ip);
 }
 
 void MainWindow::LoadStart()
 {
-    this->loadScene_.reset(new QGraphicsScene());
+    this->load_scene_.reset(new QGraphicsScene());
     QGraphicsTextItem *textItem = new QGraphicsTextItem(QString("loading....Plase wait"));
     QFont loadF("Arial",40,10);
     textItem->setFont(loadF);
     textItem->setPos(67, 90);
-    this->loadScene_->addItem(textItem);
-    this->ui->graphicsView_frames->setScene(this->loadScene_.data());
+    this->load_scene_->addItem(textItem);
+    this->ui->graphicsView_frames->setScene(this->load_scene_.data());
 }
 
 void MainWindow::on_pushButton_Show_clicked()
@@ -101,12 +98,12 @@ void MainWindow::on_pushButton_Show_clicked()
 
 void MainWindow::Set_scene()
 {
-    this->currentScene_.reset(new QGraphicsScene());
-    this->currentScene_->addPixmap(this->client.frames.first().GetPmap());
+    this->current_scene_.reset(new QGraphicsScene());
+    this->current_scene_->addPixmap(this->client.frames.first().GetPmap());
 
     this->ui->label_time->setText(this->client.frames.first().GetTime());
     this->ui->horizontalSlider_ch->setEnabled(true);
-    this->ui->graphicsView_frames->setScene(this->currentScene_.data());
+    this->ui->graphicsView_frames->setScene(this->current_scene_.data());
     this->ui->horizontalSlider_ch->setMaximum(this->client.frames.count()-1);
     this->ui->horizontalSlider_ch->setMinimum(0);
 
@@ -114,10 +111,10 @@ void MainWindow::Set_scene()
 
 void MainWindow::on_horizontalSlider_ch_sliderMoved(int position)
 {
-    this->currentScene_.reset(new QGraphicsScene());
-    this->currentScene_->addPixmap(this->client.frames[position].GetPmap());
+    this->current_scene_.reset(new QGraphicsScene());
+    this->current_scene_->addPixmap(this->client.frames[position].GetPmap());
 
-    this->ui->graphicsView_frames->setScene(this->currentScene_.data());
+    this->ui->graphicsView_frames->setScene(this->current_scene_.data());
     this->ui->label_time->setText(this->client.frames[position].GetTime());
 }
 

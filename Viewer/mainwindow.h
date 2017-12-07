@@ -34,8 +34,8 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
-    QSharedPointer<QGraphicsScene> loadScene_;
-    QSharedPointer<QGraphicsScene> currentScene_;
+    QSharedPointer<QGraphicsScene> load_scene_;
+    QSharedPointer<QGraphicsScene> current_scene_;
 };
 
 #endif // MAINWINDOW_H

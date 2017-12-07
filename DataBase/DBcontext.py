@@ -8,75 +8,75 @@ class Context:
         self.engine = create_engine(conString, pool_size=DBconfig.DBMAXPOOL, max_overflow=DBconfig.DBMAXOVERFLOW)
         Base.metadata.create_all(self.engine)
 
-    def StartSession(self):
+    def startSession(self):
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
 
-    def EndSession(self):
+    def endSession(self):
         self.session.commit()
 
-    def AddClient(self, ip):
-        self.StartSession()
+    def add_client(self, ip):
+        self.startSession()
         new_client = Client(ip=ip)
         self.session.add(new_client)
-        self.EndSession()
+        self.endSession()
 
-    def AddFrame(self, clientIp, time):
-        self.StartSession()
+    def add_frame(self, clientIp, time):
+        self.startSession()
         new_frame = Frame(time)
-        select_client = self.GetClient(clientIp)
+        select_client = self.getClient(clientIp)
         new_frame.parent = select_client
         self.session.add(new_frame)
-        self.EndSession()
+        self.endSession()
 
-    def AddPart(self, time, ip, x, y):
-        self.StartSession()
-        lastFrameId = self.GetLastFrame(ip)
+    def add_part(self, time, ip, x, y):
+        self.startSession()
+        lastFrameId = self.get_last_frame(ip)
         new_part = FramePart(time, lastFrameId.id, x, y)
 
         self.session.add(new_part)
-        self.EndSession()
+        self.endSession()
 
-    def AddRole(self, role, token):
-        self.StartSession()
+    def add_role(self, role, token):
+        self.startSession()
         new_role = Role(role, token)
         self.session.add(new_role)
-        self.EndSession()
+        self.endSession()
 
-    def IsClient(self, client_ip):
-        self.StartSession()
-        clientres = self.GetClient(client_ip)
+    def is_client(self, client_ip):
+        self.startSession()
+        clientres = self.getClient(client_ip)
 
         if clientres is None:
             return False
         else:
             return True
 
-    def GetClient(self, ip):
-        self.StartSession()
+    def getClient(self, ip):
+        self.startSession()
 
         select_client = self.session.query(Client).filter_by(ip=ip).first()
-        self.EndSession()
+        self.endSession()
 
         return select_client
 
-    def GetLastFrame(self, ip):
-        self.StartSession()
-        selectclient = self.GetClient(ip)
+    def get_last_frame(self, ip):
+        self.startSession()
+        selectclient = self.getClient(ip)
         query = "select * from Frame where time =(select MAX(time)from Frame) and   client_id = '%s'" % selectclient.id
         maxtime = self.session.execute(query)
-        self.EndSession()
+        self.endSession()
         return maxtime.fetchone()
 
-    def GetAlLIP(self):
-        self.StartSession()
+    def get_all_ip(self):
+        self.startSession()
         selip = self.session.execute("SELECT ip from client")
-        self.EndSession()
+        self.endSession()
         return selip
 
-    def GetRangeFrames(self, startTime, endTime, clientip):
-        self.StartSession()
-        client = self.GetClient(clientip)
+    def get_range_frames(self, startTime, endTime, clientip):
+        self.startSession()
+        client = self.getClient(clientip)
 
         query = "select * from Frame where time BETWEEN %s and %s  and client_id='%d'" % (startTime, endTime, client.id)
         i = 0
@@ -86,7 +86,7 @@ class Context:
 
         for row in selectframes:
             list_fnames.append(str(row.time))
-            querypart = "select time,Posx,Posy from FramePart where frame_id = '%d'" % row.id
+            querypart = "select time,lefttop_x,lefttop_y from FramePart where frame_id = '%d'" % row.id
             select_parts = self.session.execute(querypart)
 
             list_pnames.append(list())
@@ -96,11 +96,11 @@ class Context:
 
             i += 1
 
-        self.EndSession()
+        self.endSession()
         return (list_fnames, list_pnames)
 
-    def RoleInit(self, token):
-        self.StartSession()
+    def role_init(self, token):
+        self.startSession()
         role = self.session.query(Role).filter_by(token=token).first()
-        self.EndSession()
+        self.endSession()
         return role

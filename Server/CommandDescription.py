@@ -1,38 +1,38 @@
 from enum import Enum
 
-class CmdPr(Enum):
+class Cmd_property(Enum):
 
-    SFUNC = 'F'         # This symbol denotes the function
-    TOK = 'token'
+    FUNCTION = 'F'         # This symbol denotes the function
+    TOKEN = 'token'
     CLIENT = 'client'
-    VW = 'viewer'
+    VIEWER = 'viewer'
     SIZE = 'size'
-    STAT = 'status'
-    PX = 'posx'
-    PY = 'posy'
+    STATUS = 'status'
+    LEFTTOPX = 'posx'
+    LEFTTOPY = 'posy'
     IP = 'ip'
-    STIME = 'startT'
-    ETIME = 'endT'
-    FCOUNT = 'Fcount'
+    STARTTIME = 'startT'
+    ENDTIME = 'endT'
+    FRAMECOUNT = 'Fcount'
     TIME = 'time'
-    PCOUNT = 'partcount'
-    LISTIP = 'list_ip'
+    PARTCOUNT = 'partcount'
+    IPLIST = 'list_ip'
 
 class ServerCommand(Enum):
     RESIP = 0
-    RESFINFO = 1
-    RESPINFO = 2
+    RESFRAMEINFO = 1
+    RESPARTINFO = 2
     RESFRAMESINFO = 3
 
 class viewerCommand(Enum):
     GETFRAMESINFO = 0
-    GETFINFO = 1
-    GETPINFO = 2
+    GETFRAMEINFO = 1
+    GETPARTINFO = 2
     GETIP = 3
-    READYF = 4
-    READYP = 5
+    READYFRAME = 4
+    READYPART = 5
 
-class Fstatus(Enum):
+class Framestatus(Enum):
     NEW = 0
     CHANGE = 1
     BENCH = 2

@@ -27,16 +27,16 @@ class FramePart(Base):
     __tablename__ = 'FramePart'
     id = Column(Integer, primary_key=True)
     time = Column(DECIMAL)
-    Posx = Column(Integer)
-    Posy = Column(Integer)
+    lefttop_x = Column(Integer)
+    lefttop_y = Column(Integer)
     frame_id = Column(Integer, ForeignKey('Frame.id'))
     parent = relationship("Frame", backref="FramePart")
 
     def __init__(self, time, frameId, x, y):
         self.time = time
         self.frame_id = frameId
-        self.Posx = x
-        self.Posy = y
+        self.lefttop_x = x
+        self.lefttop_y = y
 
 class Role(Base):
     __tablename__ = 'Role'

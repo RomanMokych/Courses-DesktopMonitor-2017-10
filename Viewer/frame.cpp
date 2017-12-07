@@ -3,17 +3,17 @@
 Frame::Frame(const Frame& f)
 {
     this->time_ = f.time_;
-    this->pmap_ = f.pmap_;
+    this->map_ = f.map_;
 }
 Frame::Frame(QObject *parent) : QObject(parent)
 {
     this->setParent(parent);
 }
-Frame& Frame::operator=(const Frame& f)
+Frame& Frame::operator=(const Frame& frame)
 {
     Frame res;
-    res.pmap_ = f.pmap_;
-    res.time_ = f.time_;
+    res.map_ = frame.map_;
+    res.time_ = frame.time_;
 }
 void Frame::SetTime(const QString time)
 {
@@ -21,7 +21,7 @@ void Frame::SetTime(const QString time)
 }
 void Frame::SetPmap(const QPixmap& map)
 {
-    this->pmap_ = map;
+    this->map_ = map;
 }
 
 QString Frame::GetTime()const
@@ -31,14 +31,10 @@ QString Frame::GetTime()const
 
 void Frame::SetPmap(const QByteArray& buff)
 {
-    this->pmap_.loadFromData(buff,this->formatName_.toStdString().c_str());
+    this->map_.loadFromData(buff,this->format_name_.toStdString().c_str());
 }
 
 QPixmap Frame::GetPmap()const
 {
-    return this->pmap_;
-}
-Frame Frame::BuildFrame()
-{
-    //
+    return this->map_;
 }
